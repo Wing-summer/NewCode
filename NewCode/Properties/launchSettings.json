@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "NewCode": {
+      "commandName": "Project",
+      "commandLineArgs": "-k",
+      "hotReloadEnabled": true
+    }
+  }
+}
