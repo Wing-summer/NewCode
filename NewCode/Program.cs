@@ -14,6 +14,7 @@
  * -q：退出程序，仅在 keepalive 环境中有效
  * -add [type] [path] {ext}：添加以 type 的内容为 id ，然后用 path 作为路径，注意路径建议为相对路径，如果有 ext 参数则以它为扩展名。
  * -del [type]：删除以 type == id 的内容
+ * -cls：清理所有的配置
  * 
  * 说明：
  * 如果在 keepalive 状态，如果就不需输入 NewCode 。如果上面的参数没有，该程序按照 cmdline 命令运行
@@ -136,6 +137,11 @@ else
                 {
                     param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.DelNew;
+                }else if(isTheSame(cmd,"-cls"))
+                {
+                    codeObj.Clear();
+                    
+                    param.Operation |= OperationType.Processed;
                 }
                 else if (isTheSame(cmd, "-showAllType"))
                 {
@@ -271,7 +277,7 @@ else
                             else
                             {
                                 codeObj.Add(param.Type, new CodeObject { Type = param.Type, CodePath = param.FilePath, Ext = param.Type });
-                                File.WriteAllText(ConfigPath, JsonConvert.SerializeObject(codeObj, Formatting.Indented), Encoding.UTF8);
+                                SaveConfig(ConfigPath, codeObj);
                                 ShowInfo("添加完毕，可用 进行查看！");
                             }
                         }
@@ -293,7 +299,7 @@ else
                         if (codeObj.ContainsKey(param.Type))
                         {
                             codeObj.Remove(param.Type);
-                            File.WriteAllText(ConfigPath, JsonConvert.SerializeObject(codeObj, Formatting.Indented), Encoding.UTF8);
+                            SaveConfig(ConfigPath, codeObj);
                         }
                         else
                         {
@@ -391,6 +397,10 @@ static void ShowInfo(string message)
     Console.WriteLine($">>【信息】{message}");
     Console.ForegroundColor=ConsoleColor.White;
 }
+
+static void SaveConfig(string configPath, Dictionary<string, CodeObject>? codeObj) 
+    => File.WriteAllText(configPath, JsonConvert.SerializeObject(codeObj, Formatting.Indented), Encoding.UTF8);
+
 
 static string ProcessCode(string code)
 {
