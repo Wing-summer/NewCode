@@ -6,15 +6,17 @@
  * NewCode -q
  * 
  * 参数含义：
- * -t | --type：类型，配置 json 代码块时的 id
- * -p | --path：路径，创建文件的路径，如果省略后缀，则以 json 配置为准添加
- * -k | --keepalive | --keep | --alive：执行该程序后不会退出，保持运行状态，可以执行其他的命令
- * -f | --fill | --param：填充可变参数，这对于模板十分有用，如何编写合适请见示例
- * -st | --settype：程序运行后，如果没特地设置，默认调用配置文件的第一个
+ * -t | -type：类型，配置 json 代码块时的 id
+ * -p | -path：路径，创建文件的路径，如果省略后缀，则以 json 配置为准添加
+ * -k | -keepalive | -keep | -alive：执行该程序后不会退出，保持运行状态，可以执行其他的命令
+ * -f | -fill | -param：填充可变参数，这对于模板十分有用，如何编写合适请见示例
+ * -st | -settype：程序运行后，如果没特地设置，默认调用配置文件的第一个
  * -q：退出程序，仅在 keepalive 环境中有效
  * -add [type] [path] {ext}：添加以 type 的内容为 id ，然后用 path 作为路径，注意路径建议为相对路径，如果有 ext 参数则以它为扩展名。
  * -del [type]：删除以 type == id 的内容
  * -cls：清理所有的配置
+ * -showAll：显示所有配置键值
+ * -showInfo [type]：显示该类型的所有信息
  * 
  * 说明：
  * 如果在 keepalive 状态，如果就不需输入 NewCode 。如果上面的参数没有，该程序按照 cmdline 命令运行
@@ -26,6 +28,7 @@ using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text;
+using NewCode;
 
 Console.ForegroundColor = ConsoleColor.Green;
 Console.WriteLine("NewCode，为简化写代码而生，By. Wing Summer！！！");
@@ -77,17 +80,17 @@ else
             {
                 var cmd = TrimInvaildChars(cmdlines[i], trimchar);
 
-                if (isTheSame(cmd, "-t") || isTheSame(cmd, "--type"))
+                if (isTheSame(cmd, "-t") || isTheSame(cmd, "-type"))
                 {
                     CodeNewEnvironment.CurrentType = param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.NewCode;
                 }
-                else if (isTheSame(cmd, "-p") || isTheSame(cmd, "--path"))
+                else if (isTheSame(cmd, "-p") || isTheSame(cmd, "-path"))
                 {
                     param.FilePath = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.NewCode;
                 }
-                else if (isTheSame(cmd, "-f") || isTheSame(cmd, "--fill"))
+                else if (isTheSame(cmd, "-f") || isTheSame(cmd, "-fill") || isTheSame(cmd, "-param"))
                 {
                     while (i < cmdlines.Length - 1)
                     {
@@ -102,7 +105,7 @@ else
                         }
                     }
                 }
-                else if (isTheSame(cmd, "-k") || isTheSame(cmd, "--alive") || isTheSame(cmd, "--keep") || isTheSame(cmd, "--keepalive"))
+                else if (isTheSame(cmd, "-k") || isTheSame(cmd, "-alive") || isTheSame(cmd, "-keep") || isTheSame(cmd, "-keepalive"))
                 {
                     if (param.IsKeepingAlive)
                     {
@@ -111,12 +114,12 @@ else
                     param.IsKeepingAlive = true;
                     param.Operation |= OperationType.Processed;
                 }
-                else if (isTheSame(cmd, "-st") || isTheSame(cmd, "--settype"))
+                else if (isTheSame(cmd, "-st") || isTheSame(cmd, "-settype"))
                 {
                     CodeNewEnvironment.CurrentType = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.SetType;
                 }
-                else if (isTheSame(cmd, "-q") || isTheSame(cmd, "--quit"))
+                else if (isTheSame(cmd, "-q") || isTheSame(cmd, "-quit"))
                 {
                     return;
                 }
@@ -140,19 +143,29 @@ else
                 }else if(isTheSame(cmd,"-cls"))
                 {
                     codeObj.Clear();
-                    
+                    SaveConfig(ConfigPath,codeObj);
                     param.Operation |= OperationType.Processed;
                 }
-                else if (isTheSame(cmd, "-showAllType"))
+                else if (isTheSame(cmd, "-showAll"))
                 {
-                    param.Operation |= OperationType.Show;
+                    param.Operation |= OperationType.ShowAll;
+                }
+                else if (isTheSame(cmd, "-showInfo"))
+                {
+                    param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
+                    param.Operation |= OperationType.ShowInfo;
+                }
+                else if (isTheSame(cmd, "-h") || isTheSame(cmd, "-help"))
+                {
+                    ShowHelp();
+                    param.Operation |= OperationType.Processed;
                 }
             }
         }
         catch (IndexOutOfRangeException)
         {
             ShowError("输入参数个数缺失！！！");
-            continue;
+            goto LblParse;
         }
 
         //解析完毕，进行处理
@@ -185,10 +198,16 @@ else
         {
             case OperationType.None:
                 {
+                    if (cmdlines[0].StartsWith('-'))
+                    {
+                        ShowError("非法调用外部命令，请查看是命令是否输入错误。");
+                        break;
+                    }
+
                     ProcessStartInfo startInfo = new()
                     {
                         FileName = "cmd.exe",
-                        Arguments = $"/c {cmdlines[0]}&exit",
+                        Arguments = $"/c {string.Join(' ', cmdlines)}&exit",
                         CreateNoWindow = false
                     };
                     var p = Process.Start(startInfo);
@@ -201,10 +220,17 @@ else
             case OperationType.NewCode:
                 {
                     var curtype = CodeNewEnvironment.CurrentType;
+
+                    if (curtype == null)
+                    {
+                        ShowError("当前的创建代码模板类型为 NULL ，故无法创建代码！");
+                        break;
+                    }
+
                     if (!codeObj.ContainsKey(curtype))
                     {
                         ShowError("键值不存在，故无法继续！");
-                        continue;
+                        break;
                     }
 
                     var co = codeObj[curtype];
@@ -213,7 +239,7 @@ else
                     if (!File.Exists(p))
                     {
                         ShowError($" {p}  未找到，故无法继续！");
-                        continue;
+                        break;
                     }
 
                     StreamWriter? sw = null;
@@ -312,7 +338,7 @@ else
                     }
                 }
                 break;
-            case OperationType.Show:
+            case OperationType.ShowAll:
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine(">> 如下是存储的 Type：");
@@ -321,7 +347,6 @@ else
                     {
                         Console.WriteLine(item);
                     }
-                    Console.WriteLine();
                     Console.ForegroundColor = ConsoleColor.White;
                 }
                 break;
@@ -332,7 +357,24 @@ else
             case OperationType.CurType:
                 ShowInfo(CodeNewEnvironment.CurrentType);
                 break;
+            case OperationType.ShowInfo:
+                {
+                    if (!codeObj.ContainsKey(param.Type))
+                    {
+                        ShowError("键值不存在，请修改进行查询！");
+                        break;
+                    }
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"如下是 {param.Type} 的信息：");
+                    var item = codeObj[param.Type];
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"代码的类型：{item.Type}\n代码扩展名：{item.Ext}\n代码路径：{item.CodePath}\n代码绝对路径：{Path.GetFullPath(item.CodePath)}");
+                    Console.ForegroundColor = ConsoleColor.White;
+                }
+                break;
         }
+
+    LblParse:
 
         if (param.IsKeepingAlive)
         {
@@ -363,7 +405,12 @@ static void Pause()
 
 static void ShowHelp()
 {
-
+    Console.ForegroundColor= ConsoleColor.Yellow;
+    Console.WriteLine("如下是本程序的帮助：\n");
+    Console.ForegroundColor = ConsoleColor.Blue;
+    Console.WriteLine(Resource.HelpFile);
+    Console.ForegroundColor = ConsoleColor.White;
+    Console.WriteLine();
 }
 
 static string TrimInvaildChars(string? cmd, char[] trimchar)
@@ -437,14 +484,15 @@ struct CodeNewEnvironment
 }
 
 [Flags]
-enum OperationType
+enum OperationType : ulong
 {
     None = 0,
     Processed = 2 << 0,
     NewCode = 2 << 1 | Processed,
     AddNew = 2 << 2 | Processed,
     DelNew = 2 << 3 | Processed,
-    Show = 2 << 4 | Processed,
+    ShowAll = 2 << 4 | Processed,
     SetType = 2 << 5 | Processed,
-    CurType = 2 << 6 | Processed
+    CurType = 2 << 6 | Processed,
+    ShowInfo = 2 << 7 | Processed
 }
