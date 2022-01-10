@@ -42,6 +42,7 @@ else
 if (args.Length < 1)
 {
     ShowHelp();
+    Console.ForegroundColor = ConsoleColor.White;
     Pause();
 }
 else
