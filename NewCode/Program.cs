@@ -14,6 +14,7 @@ Console.ForegroundColor = ConsoleColor.White;
 var processdir = AppDomain.CurrentDomain.BaseDirectory;
 var ConfigPath = Path.Combine(processdir, "NewCode.json");
 Data.IsAdmin = IsAdmin();
+string ncmd;
 
 Dictionary<string, CodeObject>? codeObj;
 
@@ -31,7 +32,42 @@ if (File.Exists(ConfigPath))
     {
         codeObj = new Dictionary<string, CodeObject>();
     }
-    CodeNewEnvironment.CurrentType=codeObj.Keys.First();
+    else
+    {
+        var invaild = false;
+        List<string> unv = new();
+        foreach (var item in codeObj.Keys)
+        {
+            var value=codeObj[item];
+            if (isTheSame(value.Type,"NULL"))
+            {
+                invaild = true;
+                unv.Add(item);
+                continue;
+            }
+            if (!File.Exists(Path.Combine(processdir,value.CodePath)))
+            {
+                invaild = true;
+                unv.Add(item);
+                continue;
+            }
+        }
+
+        if (invaild)
+        {
+            foreach (var item in unv)
+            {
+                codeObj.Remove(item);
+            }
+            ShowWarning("配置选项含有非法或无效内容，已清除。");
+        }
+    }
+
+    var keys = codeObj.Keys;
+    if (keys.Count > 0)
+    {
+        CodeNewEnvironment.CurrentType = keys.First();
+    }
 }
 else
 {
@@ -48,6 +84,7 @@ if (args.Length < 1)
 else
 {
     var cmdlines = args;
+    ncmd = string.Join(' ', args);
 
     do
     {
@@ -113,7 +150,51 @@ else
                     if (cmdlines.Length == 4)
                         param.Ext = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.AddNew;
+                    if (isTheSame(param.Type,"NULL"))
+                    {
+                        param.Operation = OperationType.Processed;
+                        ShowError("无效数据！！！");
+                        goto LblParse;
+                    }
+                }
+                else if (isTheSame(cmd, "-mod"))
+                {
+                    param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
+                    if (!codeObj.ContainsKey(param.Type))
+                    {
+                        ShowError("键值不存在，故无法修改！");
+                    }
+                    string tmp;
+                    if (cmdlines.Length == 3)
+                    {
+                        tmp = cmdlines[++i];
+                        if (string.Compare(tmp, 0, "p=", 0, 2, true) == 0)
+                        {
+                            param.FilePath = tmp[2..];
+                        }
+                        else  if (string.Compare(tmp, 0, "ext=", 0, 4, true) == 0)
+                        {
+                            param.Ext = tmp[4..];
+                        }
 
+                    }
+                    else if (cmdlines.Length == 4)
+                    {
+                        for (int y = 0; y < 2; y++)
+                        {
+                            tmp = cmdlines[++i];
+
+                            if (string.Compare(tmp, 0, "p=", 0, 2, true) == 0)
+                            {
+                                param.FilePath = tmp;
+                            }
+                            else if (string.Compare(tmp, 0, "ext=", 0, 4, true) == 0)
+                            {
+                                param.Ext = tmp;
+                            }
+                        }
+                    }
+                    param.Operation |= OperationType.ModNew;
                 }
                 else if (isTheSame(cmd, "-del"))
                 {
@@ -122,7 +203,9 @@ else
                 }else if(isTheSame(cmd,"-cls"))
                 {
                     codeObj.Clear();
+                    CodeNewEnvironment.CurrentType = null;
                     SaveConfig(ConfigPath,codeObj);
+                    ShowInfo("删除成功！！！");
                     param.Operation |= OperationType.Processed;
                 }
                 else if (isTheSame(cmd, "-showAll"))
@@ -249,7 +332,7 @@ else
                     ProcessStartInfo startInfo = new()
                     {
                         FileName = "cmd.exe",
-                        Arguments = $"/c {string.Join(' ', cmdlines)}&exit",
+                        Arguments = $"/c {ncmd}&exit",
                         CreateNoWindow = false
                     };
                     var p = Process.Start(startInfo);
@@ -263,7 +346,7 @@ else
                 {
                     var curtype = CodeNewEnvironment.CurrentType;
 
-                    if (curtype == null)
+                    if (curtype == null || curtype == string.Empty)
                     {
                         ShowError("当前的创建代码模板类型为 NULL ，故无法创建代码！");
                         break;
@@ -344,9 +427,9 @@ else
                             }
                             else
                             {
-                                codeObj.Add(param.Type, new CodeObject { Type = param.Type, CodePath = param.FilePath, Ext = param.Type });
+                                codeObj.Add(param.Type, new CodeObject { Type = param.Type, CodePath = param.FilePath, Ext = param.Ext });
                                 SaveConfig(ConfigPath, codeObj);
-                                ShowInfo("添加完毕，可用 进行查看！");
+                                ShowInfo("添加完毕，可用查询函数进行查看！");
                             }
                         }
                         else
@@ -368,6 +451,12 @@ else
                         {
                             codeObj.Remove(param.Type);
                             SaveConfig(ConfigPath, codeObj);
+
+                            if (param.Type == CodeNewEnvironment.CurrentType)
+                            {
+                                var keys = codeObj.Keys;
+                                CodeNewEnvironment.CurrentType = keys.Count > 0 ? keys.First() : string.Empty;
+                            }
                         }
                         else
                         {
@@ -383,21 +472,36 @@ else
             case OperationType.ShowAll:
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine(">> 如下是存储的 Type：");
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    foreach (var item in codeObj.Keys)
+                    if (codeObj.Count > 0)
                     {
-                        Console.WriteLine(item);
+                        Console.WriteLine(">> 如下是存储的 Type：");
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        foreach (var item in codeObj.Keys)
+                        {
+                            Console.WriteLine(item);
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine(">> 没有存储的 Type。");
                     }
                     Console.ForegroundColor = ConsoleColor.White;
                 }
                 break;
             case OperationType.SetType:
+                ShowInfo("设置完毕！！！");
                 break;
             case OperationType.Processed:
                 break;
             case OperationType.CurType:
-                ShowInfo(CodeNewEnvironment.CurrentType);
+                if (CodeNewEnvironment.CurrentType == null)
+                {
+                    ShowInfo("NULL");
+                }
+                else
+                {
+                    ShowInfo(CodeNewEnvironment.CurrentType);
+                }
                 break;
             case OperationType.ShowInfo:
                 {
@@ -435,7 +539,7 @@ else
                         break;
                     }
                     var paths = value.ToString();
-                    if (paths==null)
+                    if (paths == null)
                     {
                         ShowError("解析环境变量路径键值失败！");
                         break;
@@ -499,13 +603,32 @@ else
                     ShowError(e.Message);
                 }
                 break;
+            case OperationType.ModNew:
+                {
+                    if (param.FilePath != null && param.FilePath.Length > 0)
+                    {
+                        if (File.Exists(GetFilePath(param.FilePath, processdir)))
+                        {
+                            codeObj[param.Type].CodePath = param.FilePath;
+                        }
+                        else
+                        {
+                            ShowWarning("代码文件不存在，故忽略");
+                        }
+                    }
+                    if (param.Ext.Length>0)
+                    {
+                        codeObj[param.Type].Ext = param.Ext;
+                    }
+                    SaveConfig(ConfigPath,codeObj);
+                }
+                break;
         }
 
     LblParse:
 
         if (param.IsKeepingAlive)
         {
-            string ncmd;
             //等待下一次输入命令
             do
             {
@@ -527,7 +650,7 @@ else
 
 static void Pause()
 {
-    Console.WriteLine("按任意键继续……");
+    Console.Write("按任意键继续……");
     Console.ReadKey(true);
 }
 
@@ -540,6 +663,14 @@ static void ShowHelp()
     Console.WriteLine();
 }
 
+static string GetFilePath(string path, string dfolder)
+{
+    if (!Path.IsPathRooted(path))
+    {
+        return Path.Combine(dfolder, path);
+    }
+    return path;
+}
 
 static void ConsoleIn()
 {
@@ -563,21 +694,21 @@ static bool isTheSame(string? s1, string? s2)
     return string.Compare(s1, s2, true) == 0;
 }
 
-static void ShowWarning(string message)
+static void ShowWarning(string? message)
 {
     Console.ForegroundColor = ConsoleColor.DarkYellow;
     Console.WriteLine($">>【警告】{message}");
     Console.ForegroundColor = ConsoleColor.White;
 }
 
-static void ShowError(string message)
+static void ShowError(string? message)
 {
     Console.ForegroundColor = ConsoleColor.Red;
     Console.WriteLine($">>【错误】{message}");
     Console.ForegroundColor = ConsoleColor.White;
 }
 
-static void ShowInfo(string message)
+static void ShowInfo(string? message)
 {
     Console.ForegroundColor= ConsoleColor.Cyan;
     Console.WriteLine($">>【信息】{message}");
@@ -626,7 +757,7 @@ struct CmdLineParam
 
 struct CodeNewEnvironment
 {
-    public string CurrentType { get; set; }
+    public string? CurrentType { get; set; }
 
 }
 
@@ -643,7 +774,8 @@ enum OperationType : ulong
     CurType = 2 << 6 | Processed,
     ShowInfo = 2 << 7 | Processed,
     SetEnv= 2 << 8 | Processed,
-    DelEnv = 2 << 9 | Processed
+    DelEnv = 2 << 9 | Processed,
+    ModNew = 2 << 10 | Processed
 }
 
 static class Data
