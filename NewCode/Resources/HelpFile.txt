@@ -18,6 +18,10 @@ NewCode -q
 -showAll：显示所有配置键值
 -showInfo [type]：显示该类型的所有信息
 -showtype [type]：作用同 -showInfo
+-r | -restart：重启程序，如果后面带有 # 作为参数说明以管理员权限重启，重启默认带有 -k 参数。
+-curdir | -pwd：显示当前工作目录
+-prodir：显示该程序所在目录
 
 说明：
-如果在 keepalive 状态，如果就不需输入 NewCode 。如果上面的参数没有，该程序按照 cmdline 命令运行
+如果在 keepalive 状态，就不需输入 NewCode 。如果上面的参数没有，该程序会调用 cmd 命令运行。
+如果被视为 cmd 命令运行，开头不得带有 - 字符，否则视为内部命令。

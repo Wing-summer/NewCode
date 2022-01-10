@@ -1,41 +1,19 @@
-﻿/*本工具的用法，命令不区分大小写：
- * 
- * NewCode -t cpp -p C:\test -k
- * NewCode -st c
- * NewCode -t cpp -p C:\test -f "hello" " world"
- * NewCode -q
- * 
- * 参数含义：
- * -t | -type：类型，配置 json 代码块时的 id
- * -p | -path：路径，创建文件的路径，如果省略后缀，则以 json 配置为准添加
- * -k | -keepalive | -keep | -alive：执行该程序后不会退出，保持运行状态，可以执行其他的命令
- * -f | -fill | -param：填充可变参数，这对于模板十分有用，如何编写合适请见示例
- * -st | -settype：程序运行后，如果没特地设置，默认调用配置文件的第一个
- * -q：退出程序，仅在 keepalive 环境中有效
- * -add [type] [path] {ext}：添加以 type 的内容为 id ，然后用 path 作为路径，注意路径建议为相对路径，如果有 ext 参数则以它为扩展名。
- * -del [type]：删除以 type == id 的内容
- * -cls：清理所有的配置
- * -showAll：显示所有配置键值
- * -showInfo [type]：显示该类型的所有信息
- * 
- * 说明：
- * 如果在 keepalive 状态，如果就不需输入 NewCode 。如果上面的参数没有，该程序按照 cmdline 命令运行
- * 
- */
-
-
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using Microsoft.Win32;
 using System.Text;
+using System.Security.Principal;
 using NewCode;
+using System.ComponentModel;
 
-Console.ForegroundColor = ConsoleColor.Green;
-Console.WriteLine("NewCode，为简化写代码而生，By. Wing Summer！！！");
+Console.OutputEncoding = Encoding.UTF8;
+Console.ForegroundColor = ConsoleColor.Cyan;
+Console.WriteLine(Resource.MyInfo);
 Console.ForegroundColor = ConsoleColor.White;
-var currentdir = Environment.CurrentDirectory;
 var processdir = AppDomain.CurrentDomain.BaseDirectory;
 var ConfigPath = Path.Combine(processdir, "NewCode.json");
+Data.IsAdmin = IsAdmin();
 
 Dictionary<string, CodeObject>? codeObj;
 
@@ -72,7 +50,7 @@ else
 
     do
     {
-        //解析命令行
+        //解析命令行代码区
         try
         {
             param.Operation = OperationType.None;
@@ -150,7 +128,7 @@ else
                 {
                     param.Operation |= OperationType.ShowAll;
                 }
-                else if (isTheSame(cmd, "-showInfo"))
+                else if (isTheSame(cmd, "-showInfo") || isTheSame(cmd, "-showtype"))
                 {
                     param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.ShowInfo;
@@ -160,12 +138,64 @@ else
                     ShowHelp();
                     param.Operation |= OperationType.Processed;
                 }
+                else if (isTheSame(cmd, "-setenv"))
+                {
+                    param.Operation |= OperationType.SetEnv;
+                }
+                else if (isTheSame(cmd, "-delenv"))
+                {
+                    param.Operation |= OperationType.DelEnv;
+                }
+                else if (isTheSame(cmd, "-r") || isTheSame(cmd, "-restart"))
+                {
+                    string id = string.Empty;
+                    if (cmdlines.Length == 2)
+                    {
+                        id = cmdlines[1];
+                    }
+
+                    try
+                    {
+                        ProcessStartInfo info = new()
+                        {
+                            FileName = Process.GetCurrentProcess().MainModule?.FileName,
+                            Arguments = "-k",
+                            UseShellExecute = true //创建新的程序
+                        };
+
+                        if (id == "#")
+                        {
+                            if (info == null)
+                            {
+                                ShowError("管理员重启失败！");
+                                goto LblParse;
+                            }
+                            info.Verb = "runas";
+                        }
+                        Process.Start(info);
+                        return;
+                    }
+                    catch (Win32Exception)
+                    {
+                        ShowError("请求管理员权限未授权，故重启失败。");
+                    }
+                }
+                else if (isTheSame(cmd, "-pwd") || isTheSame(cmd, "-curdir"))
+                {
+                    ShowInfo(Environment.CurrentDirectory);
+                    param.Operation |= OperationType.Processed;
+                }
+                else if (isTheSame(cmd, "-prodir"))
+                {
+                    ShowInfo(processdir);
+                    param.Operation |= OperationType.Processed;
+                }
             }
         }
         catch (IndexOutOfRangeException)
         {
             ShowError("输入参数个数缺失！！！");
-            goto LblParse;
+            param.Operation = OperationType.Processed;
         }
 
         //解析完毕，进行处理
@@ -174,25 +204,36 @@ else
         var hasAddNew = flags.HasFlag(OperationType.AddNew);
         var hasDelNew = flags.HasFlag(OperationType.DelNew);
         var hasCurType = flags.HasFlag(OperationType.CurType);
+        var hasSetEnv = flags.HasFlag(OperationType.SetEnv);
+        var hasDelEnv = flags.HasFlag(OperationType.DelEnv);
 
-        if (hasCurType && hasAddNew && hasDelNew)
+        if (hasCurType && (hasAddNew || hasDelNew || hasDelEnv || hasSetEnv))
         {
             ShowWarning("由于使用获取环境信息命令，其他所有操作被屏蔽。");
+            param.Operation = OperationType.CurType;
         }
         else
         {
-            if (hasAddNew && hasDelNew)
+            if ((hasAddNew && hasDelNew) || (hasSetEnv && hasDelEnv))
             {
                 ShowError("出现操作冲突，故终止。");
-                continue;
+                goto LblParse;
             }
 
-            if ((hasAddNew || hasDelNew) && flags.HasFlag(OperationType.NewCode))
+            if ((hasDelEnv || hasSetEnv) && (hasDelNew || hasAddNew))
             {
-                ShowWarning("由于执行增删操作，故通过模板新建文件失败！");
+                ShowWarning("涉及修改环境变量信息的命令，故屏蔽其他命令。");
+                param.Operation = hasSetEnv ? OperationType.SetEnv : OperationType.DelEnv;
+            }
+            else
+            {
+                if ((hasAddNew || hasDelNew) && flags.HasFlag(OperationType.NewCode))
+                {
+                    ShowWarning("由于执行增删操作，故通过模板新建文件失败！");
+                }
+
             }
         }
-
 
         switch (param.Operation)
         {
@@ -248,7 +289,7 @@ else
 
                     if (!Path.IsPathRooted(op))
                     {
-                        op = Path.Combine(currentdir, op);
+                        op = Path.Combine(Environment.CurrentDirectory, op);
                     }
 
                     if (!Path.HasExtension(op))
@@ -372,6 +413,91 @@ else
                     Console.ForegroundColor = ConsoleColor.White;
                 }
                 break;
+            case OperationType.SetEnv:
+                try
+                {
+                    if (!Data.IsAdmin)
+                    {
+                        ShowError("非管理员权限无法使用此操作！");
+                        break;
+                    }
+                    RegistryKey? key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Environment", true);
+                    if (key == null)
+                    {
+                        ShowError("打开注册表失败！！！");
+                        break;
+                    }
+                    var value = key.GetValue("Path");
+                    if (value == null)
+                    {
+                        ShowError("打开环境变量路径键值失败！！！");
+                        break;
+                    }
+                    var paths = value.ToString();
+                    if (paths==null)
+                    {
+                        ShowError("解析环境变量路径键值失败！");
+                        break;
+                    }
+
+                    key.SetValue("Path", string.Join(';', value, processdir));
+                    key.Close();
+                    ShowInfo("修改完毕！");
+
+                }
+                catch (Exception e)
+                {
+                    ShowError(e.Message);
+                }
+                break;
+            case OperationType.DelEnv:
+                try
+                {
+                    if (!Data.IsAdmin)
+                    {
+                        ShowError("非管理员权限无法使用此操作！");
+                        break;
+                    }
+                    RegistryKey? key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Environment", true);
+                    if (key == null)
+                    {
+                        ShowError("打开注册表失败！！！");
+                        break;
+                    }
+                    var value = key.GetValue("Path");
+                    if (value == null)
+                    {
+                        ShowError("打开环境变量路径键值失败！！！");
+                        break;
+                    }
+                    var paths = value.ToString();
+                    if (paths == null)
+                    {
+                        ShowError("解析环境变量路径键值失败！");
+                        break;
+                    }
+
+                    var mpaths = paths.Split(";");
+                    List<string> lpath = new();
+                    foreach (var mp in mpaths)
+                    {
+                        DirectoryInfo info = new(mp);
+                        if (!isTheSame(info.FullName, processdir))
+                        {
+                            lpath.Add(mp);
+                        }
+                    }
+
+                    key.SetValue("Path", string.Join(';', lpath));
+                    key.Close();
+                    lpath.Clear();
+                    ShowInfo("修改完毕！");
+                }
+                catch (Exception e)
+                {
+                    ShowError(e.Message);
+                }
+                break;
         }
 
     LblParse:
@@ -382,8 +508,9 @@ else
             //等待下一次输入命令
             do
             {
-                Console.Write("<< ");
+                ConsoleIn();
                 ncmd = TrimInvaildChars(Console.ReadLine(), trimchar);
+                Console.ForegroundColor = ConsoleColor.White;
             } while (ncmd.Length == 0);
             cmdlines = ncmd.Split(' ');
         }
@@ -405,12 +532,23 @@ static void Pause()
 
 static void ShowHelp()
 {
-    Console.ForegroundColor= ConsoleColor.Yellow;
-    Console.WriteLine("如下是本程序的帮助：\n");
-    Console.ForegroundColor = ConsoleColor.Blue;
+    Console.ForegroundColor = ConsoleColor.Yellow;
+    Console.WriteLine(">> 如下是本程序的帮助：\n");
+    Console.ForegroundColor = ConsoleColor.Cyan;
     Console.WriteLine(Resource.HelpFile);
-    Console.ForegroundColor = ConsoleColor.White;
     Console.WriteLine();
+}
+
+
+static void ConsoleIn()
+{
+    Console.WriteLine();
+    Console.ForegroundColor = ConsoleColor.Black;
+    Console.BackgroundColor = Data.IsAdmin ? ConsoleColor.Red : ConsoleColor.Green;
+    Console.Write($"{(Data.IsAdmin ? '#' : '$')} <<");
+    Console.BackgroundColor = ConsoleColor.Black;
+    Console.Write(' ');
+    Console.ForegroundColor= ConsoleColor.DarkYellow;
 }
 
 static string TrimInvaildChars(string? cmd, char[] trimchar)
@@ -440,7 +578,7 @@ static void ShowError(string message)
 
 static void ShowInfo(string message)
 {
-    Console.ForegroundColor= ConsoleColor.Blue;
+    Console.ForegroundColor= ConsoleColor.Cyan;
     Console.WriteLine($">>【信息】{message}");
     Console.ForegroundColor=ConsoleColor.White;
 }
@@ -458,6 +596,14 @@ static string ProcessCode(string code)
     stringBuilder.Replace("]|", "}");
     return stringBuilder.ToString();    
 }
+
+static bool IsAdmin()
+{
+    WindowsIdentity identity = WindowsIdentity.GetCurrent();
+    WindowsPrincipal principal = new(identity);
+    return principal.IsInRole(WindowsBuiltInRole.Administrator);
+}
+
 
 class CodeObject
 {
@@ -494,5 +640,12 @@ enum OperationType : ulong
     ShowAll = 2 << 4 | Processed,
     SetType = 2 << 5 | Processed,
     CurType = 2 << 6 | Processed,
-    ShowInfo = 2 << 7 | Processed
+    ShowInfo = 2 << 7 | Processed,
+    SetEnv= 2 << 8 | Processed,
+    DelEnv = 2 << 9 | Processed
+}
+
+static class Data
+{
+    public static bool IsAdmin { get; set; }
 }

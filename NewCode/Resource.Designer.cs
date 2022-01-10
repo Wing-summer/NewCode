@@ -61,11 +61,36 @@ namespace NewCode {
         }
         
         /// <summary>
-        ///   查找类似  的本地化字符串。
+        ///   查找类似 命令不区分大小写，如下为示例：
+        ///
+        ///NewCode -t cpp -p C:\test -k
+        ///NewCode -st c
+        ///NewCode -t cpp -p C:\test -f &quot;hello&quot; &quot; world&quot;
+        ///NewCode -q
+        ///
+        ///参数含义：
+        ///-t | -type：类型，配置 json 代码块时的 id
+        ///-p | -path：路径，创建文件的路径，如果省略后缀，则以 json 配置为准添加
+        ///-k | -keepalive | -keep | -alive：执行该程序后不会退出，保持运行状态，可以执行其他的命令
+        ///-f | -fill | -param：填充可变参数，这对于模板十分有用，如何编写合适请见示例
+        ///-st | -settype：程序运行后，如果没特地设置，默认调用配置文件的第一个
+        ///-q：退出程序，仅在 keepalive 环境中有效
+        ///-add [type] [path] {ext}：添加以 type 的内容为 id ，然后用 path 作为路径，注意路径建议为相对路径，如果有 ext 参数则以它为扩展名。
+        ///-del [type]：删除以 type == id 的内容
+        /// [字符串的其余部分被截断]&quot;; 的本地化字符串。
         /// </summary>
         internal static string HelpFile {
             get {
                 return ResourceManager.GetString("HelpFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似  的本地化字符串。
+        /// </summary>
+        internal static string MyInfo {
+            get {
+                return ResourceManager.GetString("MyInfo", resourceCulture);
             }
         }
     }
