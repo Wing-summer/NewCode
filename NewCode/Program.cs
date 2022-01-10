@@ -38,14 +38,14 @@ if (File.Exists(ConfigPath))
         List<string> unv = new();
         foreach (var item in codeObj.Keys)
         {
-            var value=codeObj[item];
-            if (isTheSame(value.Type,"NULL"))
+            var value = codeObj[item];
+            if (isTheSame(value.Type, "NULL"))
             {
                 invaild = true;
                 unv.Add(item);
                 continue;
             }
-            if (!File.Exists(Path.Combine(processdir,value.CodePath)))
+            if (!File.Exists(Path.Combine(processdir, value.CodePath)))
             {
                 invaild = true;
                 unv.Add(item);
@@ -154,7 +154,7 @@ else
                     if (cmdlines.Length == 4)
                         param.Ext = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.AddNew;
-                    if (isTheSame(param.Type,"NULL"))
+                    if (isTheSame(param.Type, "NULL"))
                     {
                         param.Operation = OperationType.Processed;
                         ShowError("无效数据！！！");
@@ -176,7 +176,7 @@ else
                         {
                             param.FilePath = tmp[2..];
                         }
-                        else  if (string.Compare(tmp, 0, "ext=", 0, 4, true) == 0)
+                        else if (string.Compare(tmp, 0, "ext=", 0, 4, true) == 0)
                         {
                             param.Ext = tmp[4..];
                         }
@@ -204,11 +204,12 @@ else
                 {
                     param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.DelNew;
-                }else if(isTheSame(cmd,"-cls"))
+                }
+                else if (isTheSame(cmd, "-cls"))
                 {
                     codeObj.Clear();
                     CodeNewEnvironment.CurrentType = null;
-                    SaveConfig(ConfigPath,codeObj);
+                    SaveConfig(ConfigPath, codeObj);
                     ShowInfo("删除成功！！！");
                     param.Operation |= OperationType.Processed;
                 }
@@ -385,9 +386,29 @@ else
                         op = Path.ChangeExtension(op, co.Ext);
                     }
                     buffer = File.ReadAllText(p);
-
                     try
                     {
+
+                        if (File.Exists(op))
+                        {
+                            ShowWarning($" {op} 已存在，请输入 y 确认！");
+                            Console.Write("按下 y 确认覆盖，按下 n 取消：");
+                            ConsoleKeyInfo kd;
+                            do
+                            {
+                                kd = Console.ReadKey(true);
+                            } while (kd.Key != ConsoleKey.Y && kd.Key != ConsoleKey.N);
+                            if (kd.Key == ConsoleKey.N)
+                            {
+                                Console.WriteLine("N");
+                                throw new IOException("文件覆盖已被用户取消！");
+                            }
+                            else
+                            {
+                                Console.WriteLine("Y");
+                            }
+                        }
+
                         using (sw = new(op, false, Encoding.UTF8))
                         {
                             sw.WriteLine(string.Format(ProcessCode(buffer), arguments.ToArray()));
@@ -620,11 +641,11 @@ else
                             ShowWarning("代码文件不存在，故忽略");
                         }
                     }
-                    if (param.Ext.Length>0)
+                    if (param.Ext.Length > 0)
                     {
                         codeObj[param.Type].Ext = param.Ext;
                     }
-                    SaveConfig(ConfigPath,codeObj);
+                    SaveConfig(ConfigPath, codeObj);
                     ShowInfo("修改成功！！！");
                 }
                 break;
@@ -685,7 +706,7 @@ static void ConsoleIn()
     Console.Write($"{(Data.IsAdmin ? '#' : '$')} <<");
     Console.BackgroundColor = ConsoleColor.Black;
     Console.Write(' ');
-    Console.ForegroundColor= ConsoleColor.DarkYellow;
+    Console.ForegroundColor = ConsoleColor.DarkYellow;
 }
 
 static string TrimInvaildChars(string? cmd, char[] trimchar)
@@ -715,12 +736,12 @@ static void ShowError(string? message)
 
 static void ShowInfo(string? message)
 {
-    Console.ForegroundColor= ConsoleColor.Cyan;
+    Console.ForegroundColor = ConsoleColor.Cyan;
     Console.WriteLine($">>【信息】{message}");
-    Console.ForegroundColor=ConsoleColor.White;
+    Console.ForegroundColor = ConsoleColor.White;
 }
 
-static void SaveConfig(string configPath, Dictionary<string, CodeObject>? codeObj) 
+static void SaveConfig(string configPath, Dictionary<string, CodeObject>? codeObj)
     => File.WriteAllText(configPath, JsonConvert.SerializeObject(codeObj, Formatting.Indented), Encoding.UTF8);
 
 
@@ -731,7 +752,7 @@ static string ProcessCode(string code)
     stringBuilder.Replace("}", "}}");
     stringBuilder.Replace("|[", "{");
     stringBuilder.Replace("]|", "}");
-    return stringBuilder.ToString();    
+    return stringBuilder.ToString();
 }
 
 static bool IsAdmin()
@@ -776,7 +797,7 @@ enum OperationType : ulong
     SetType = 2 << 5 | Processed,
     CurType = 2 << 6 | Processed,
     ShowInfo = 2 << 7 | Processed,
-    SetEnv= 2 << 8 | Processed,
+    SetEnv = 2 << 8 | Processed,
     DelEnv = 2 << 9 | Processed,
     ModNew = 2 << 10 | Processed
 }
