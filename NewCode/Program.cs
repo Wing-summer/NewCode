@@ -92,6 +92,10 @@ else
         try
         {
             param.Operation = OperationType.None;
+            param.Type = string.Empty;
+            param.FilePath = string.Empty;
+            param.Ext = string.Empty;
+
             for (int i = 0; i < cmdlines.Length; i++)
             {
                 var cmd = TrimInvaildChars(cmdlines[i], trimchar);
@@ -419,7 +423,7 @@ else
                 {
                     try
                     {
-                        if (param.Type.Length > 0 && param.FilePath != null && File.Exists(Path.Combine(processdir, param.FilePath)))
+                        if (param.Type.Length > 0 && File.Exists(Path.Combine(processdir, param.FilePath)))
                         {
                             if (codeObj.ContainsKey(param.Type))
                             {
@@ -427,7 +431,7 @@ else
                             }
                             else
                             {
-                                codeObj.Add(param.Type, new CodeObject { Type = param.Type, CodePath = param.FilePath, Ext = param.Ext });
+                                codeObj.Add(param.Type, new CodeObject { Type = param.Type, CodePath = param.FilePath, Ext = param.Ext.Length > 0 ? param.Ext : param.Type });
                                 SaveConfig(ConfigPath, codeObj);
                                 ShowInfo("添加完毕，可用查询函数进行查看！");
                             }
@@ -605,7 +609,7 @@ else
                 break;
             case OperationType.ModNew:
                 {
-                    if (param.FilePath != null && param.FilePath.Length > 0)
+                    if (param.FilePath.Length > 0)
                     {
                         if (File.Exists(GetFilePath(param.FilePath, processdir)))
                         {
@@ -621,6 +625,7 @@ else
                         codeObj[param.Type].Ext = param.Ext;
                     }
                     SaveConfig(ConfigPath,codeObj);
+                    ShowInfo("修改成功！！！");
                 }
                 break;
         }
@@ -740,9 +745,7 @@ static bool IsAdmin()
 class CodeObject
 {
     public string Type { get; set; } = string.Empty;
-
     public string CodePath { get; set; } = string.Empty;
-
     public string Ext { get; set; } = string.Empty;
 }
 
