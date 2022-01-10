@@ -10,7 +10,12 @@
     <DebugType>portable</DebugType>
     <Copyright>MIT,Written By Wingsummer</Copyright>
     <NeutralLanguage>zh-CN</NeutralLanguage>
+    <ApplicationIcon>ico.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="ico.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
