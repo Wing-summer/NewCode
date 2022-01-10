@@ -31,6 +31,7 @@ NewCode -q
 -st | -settype：程序运行后，如果没特地设置，默认调用配置文件的第一个
 -q：退出程序，仅在 keepalive 环境中有效
 -add [type] [path] {ext}：添加以 type 的内容为 id ，然后用 path 作为路径，注意路径建议为相对路径，如果有 ext 参数则以它为扩展名。
+-mod [type] p={path} ext={ext}：修改 type 中的配置
 -del [type]：删除以 type == id 的内容
 -cls：清理所有的配置
 -showAll：显示所有配置键值
