@@ -7,6 +7,7 @@ using System.Security.Principal;
 using NewCode;
 using System.ComponentModel;
 
+Console.InputEncoding = Encoding.Unicode;
 Console.OutputEncoding = Encoding.UTF8;
 Console.ForegroundColor = ConsoleColor.Cyan;
 Console.WriteLine(Resource.MyInfo);
@@ -279,6 +280,27 @@ else
                     ShowInfo(processdir);
                     param.Operation |= OperationType.Processed;
                 }
+                else if (isTheSame(cmd, "-cd"))
+                {
+                    try
+                    {
+                        if (Environment.CurrentDirectory == null)
+                        {
+                            Environment.CurrentDirectory = processdir;
+                        }
+                        var path= GetFilePath(cmdlines[++i], Environment.CurrentDirectory);
+                        if (!File.Exists(path))
+                        {
+                            throw new IOException($"{path} 不存在！");
+                        }
+                        Environment.CurrentDirectory = path;
+                    }
+                    catch (Exception e)
+                    {
+                        ShowError(e.Message);
+                    }
+                    param.Operation |= OperationType.Processed;
+                }
             }
         }
         catch (IndexOutOfRangeException)
@@ -364,7 +386,7 @@ else
                     }
 
                     var co = codeObj[curtype];
-                    var p = Path.Combine(processdir, co.CodePath);
+                    var p = GetFilePath(co.CodePath, processdir);
 
                     if (!File.Exists(p))
                     {
@@ -376,15 +398,13 @@ else
                     var op = TrimInvaildChars(param.FilePath, trimchar);
                     string buffer;
 
-                    if (!Path.IsPathRooted(op))
-                    {
-                        op = Path.Combine(Environment.CurrentDirectory, op);
-                    }
+                    op = GetFilePath(op, Environment.CurrentDirectory);
 
                     if (!Path.HasExtension(op))
                     {
                         op = Path.ChangeExtension(op, co.Ext);
                     }
+
                     buffer = File.ReadAllText(p);
                     try
                     {
@@ -539,7 +559,7 @@ else
                     Console.WriteLine($"如下是 {param.Type} 的信息：");
                     var item = codeObj[param.Type];
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"代码的类型：{item.Type}\n代码扩展名：{item.Ext}\n代码路径：{item.CodePath}\n代码绝对路径：{Path.GetFullPath(item.CodePath)}");
+                    Console.WriteLine($"代码的类型：{item.Type}\n代码扩展名：{item.Ext}\n代码路径：{item.CodePath}\n代码绝对路径：{GetFilePath(item.CodePath, processdir)}");
                     Console.ForegroundColor = ConsoleColor.White;
                 }
                 break;
@@ -617,7 +637,6 @@ else
                             lpath.Add(mp);
                         }
                     }
-
                     key.SetValue("Path", string.Join(';', lpath));
                     key.Close();
                     lpath.Clear();
