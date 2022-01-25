@@ -24,6 +24,8 @@ CmdLineParam param = new();
 CodeNewEnvironment CodeNewEnvironment = new();
 List<string> arguments = new();
 char[] trimchar = { '\\', '\"', '\'', '/' };
+Regex CmdRegex= new Regex("(\"[^\"]+\"|[^\\s\"]+)");
+List<string> cmdlines;
 
 if (File.Exists(ConfigPath))
 {
@@ -84,7 +86,7 @@ if (args.Length < 1)
 }
 else
 {
-    var cmdlines = args;
+    cmdlines = args.ToList();
     ncmd = string.Join(' ', args);
 
     do
@@ -97,7 +99,7 @@ else
             param.FilePath = string.Empty;
             param.Ext = string.Empty;
 
-            for (int i = 0; i < cmdlines.Length; i++)
+            for (int i = 0; i < cmdlines.Count; i++)
             {
                 var cmd = TrimInvaildChars(cmdlines[i], trimchar);
 
@@ -113,7 +115,7 @@ else
                 }
                 else if (isTheSame(cmd, "-f") || isTheSame(cmd, "-fill") || isTheSame(cmd, "-param"))
                 {
-                    while (i < cmdlines.Length - 1)
+                    while (i < cmdlines.Count - 1)
                     {
                         var item = cmdlines[++i];
                         if (!item.StartsWith('-'))
@@ -152,7 +154,7 @@ else
                 {
                     param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.FilePath = TrimInvaildChars(cmdlines[++i], trimchar);
-                    if (cmdlines.Length == 4)
+                    if (cmdlines.Count == 4)
                         param.Ext = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.AddNew;
                     if (isTheSame(param.Type, "NULL"))
@@ -170,7 +172,7 @@ else
                         ShowError("键值不存在，故无法修改！");
                     }
                     string tmp;
-                    if (cmdlines.Length == 3)
+                    if (cmdlines.Count == 3)
                     {
                         tmp = cmdlines[++i];
                         if (string.Compare(tmp, 0, "p=", 0, 2, true) == 0)
@@ -183,7 +185,7 @@ else
                         }
 
                     }
-                    else if (cmdlines.Length == 4)
+                    else if (cmdlines.Count == 4)
                     {
                         for (int y = 0; y < 2; y++)
                         {
@@ -239,7 +241,7 @@ else
                 else if (isTheSame(cmd, "-r") || isTheSame(cmd, "-restart"))
                 {
                     string id = string.Empty;
-                    if (cmdlines.Length == 2)
+                    if (cmdlines.Count == 2)
                     {
                         id = cmdlines[1];
                     }
@@ -431,7 +433,7 @@ else
 
                         using (sw = new(op, false, Encoding.UTF8))
                         {
-                            sw.WriteLine(string.Format(ProcessCode(buffer), arguments.ToArray()));
+                            sw.Write(string.Format(ProcessCode(buffer), arguments.ToArray()));
                         }
                         ShowInfo("创建完毕，请查看");
                     }
@@ -678,10 +680,18 @@ else
             do
             {
                 ConsoleIn();
-                ncmd = TrimInvaildChars(Console.ReadLine(), trimchar);
+                ncmd = ConsoleReadLine();
                 Console.ForegroundColor = ConsoleColor.White;
             } while (ncmd.Length == 0);
-            cmdlines = ncmd.Split(' ');
+
+            cmdlines.Clear();   //清理陈旧的命令解析
+
+            //处理命令行
+            var matches = CmdRegex.Matches(ncmd);
+            foreach (Match item in matches)
+            {
+                cmdlines.Add(TrimInvaildChars(item.Value, trimchar));
+            }
         }
 
         //保存当前 KeepingAlive 值，防止丢失
@@ -781,6 +791,13 @@ static bool IsAdmin()
     return principal.IsInRole(WindowsBuiltInRole.Administrator);
 }
 
+static string ConsoleReadLine()
+{
+    var buffer = Console.ReadLine();
+    if (buffer == null)
+        return string.Empty;
+    return buffer;
+}
 
 class CodeObject
 {
