@@ -290,7 +290,7 @@ else
                         {
                             Environment.CurrentDirectory = processdir;
                         }
-                        var path= GetFilePath(cmdlines[++i], Environment.CurrentDirectory);
+                        var path = GetFilePath(cmdlines[++i], Environment.CurrentDirectory);
                         if (!File.Exists(path))
                         {
                             throw new IOException($"{path} 不存在！");
@@ -305,9 +305,12 @@ else
                 }
             }
         }
-        catch (IndexOutOfRangeException)
+        catch (Exception e)
         {
-            ShowError("输入参数个数缺失！！！");
+            if (e is ArgumentOutOfRangeException || e is IndexOutOfRangeException)
+                ShowError("输入参数个数缺失！！！");
+            else
+                ShowError(e.Message);
             param.Operation = OperationType.Processed;
         }
 
