@@ -105,7 +105,7 @@ else
 
                 if (isTheSame(cmd, "-t") || isTheSame(cmd, "-type"))
                 {
-                    CodeNewEnvironment.CurrentType = param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
+                    param.Type = TrimInvaildChars(cmdlines[++i], trimchar);
                     param.Operation |= OperationType.NewCode;
                 }
                 else if (isTheSame(cmd, "-p") || isTheSame(cmd, "-path"))
